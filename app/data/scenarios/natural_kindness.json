@@ -1,0 +1,44 @@
+{
+  "id": "KO-001",
+  "name": "Natural Kindness",
+  "actors": [
+    { "actor_id": "alice", "role": "Giver" },
+    { "actor_id": "maria", "role": "Receiver" },
+    { "actor_id": "tom",   "role": "Observer" }
+  ],
+  "context": {
+    "name": "Community Energy",
+    "location": "Dashboard",
+    "time": "18:00-18:30"
+  },
+  "kindness_act": {
+    "name": "Energy Sharing",
+    "pre":  { "name": "pre",  "value": "Alice(Emotion.Medium || Surplus) || Maria(Trust.Medium)" },
+    "post": { "name": "post", "value": "Alice(Emotion.High || Surplus.Shared) || Maria(Trust.High)" }
+  },
+  "supporting_acts": [],
+  "actor_overrides": {
+    "alice": {
+      "psychological": [
+        { "kind": "Emotion",        "value": "Empathy",        "level": "Medium" },
+        { "kind": "SelfEfficacy",   "value": "EnergySharing",  "level": "High"   },
+        { "kind": "CharacterTrait", "value": "Agreeableness",  "level": "High"   },
+        { "kind": "HumanValue",     "value": "Benevolence",    "level": "High"   }
+      ],
+      "social": [
+        { "kind": "LevelOfNeed",  "value": "HealthRelated", "level": "High"   },
+        { "kind": "Relatedness",  "value": "CloseFriend",   "level": "High"   },
+        { "kind": "Trust",        "value": "Familiarity",   "level": "High"   }
+      ],
+      "motivations": [
+        { "mtype": "Other_Betterment", "level": 0.85 },
+        { "mtype": "Self_Betterment",  "level": 0.10 }
+      ]
+    },
+    "maria": {
+      "social": [
+        { "kind": "Trust", "value": "Familiarity", "level": "Medium" }
+      ]
+    }
+  }
+}

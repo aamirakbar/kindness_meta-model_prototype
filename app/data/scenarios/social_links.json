@@ -1,0 +1,7 @@
+[
+  {"a_id":"alice","b_id":"maria","relatedness":"Friend"},
+  {"a_id":"alice","b_id":"li","relatedness":"Colleague"},
+  {"a_id":"alice","b_id":"tom","relatedness":"Neighbour"},
+  {"a_id":"tom","b_id":"maria","relatedness":"Neighbour"},
+  {"a_id":"li","b_id":"muhammad","relatedness":"Neighbour"}
+]

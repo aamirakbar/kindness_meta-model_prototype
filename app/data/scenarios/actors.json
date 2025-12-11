@@ -1,0 +1,42 @@
+[
+  {
+    "id": "alice",
+    "name": "Alice",
+    "role": null,
+    "psychological": [],
+    "social": [],
+    "motivations": []
+  },
+  {
+    "id": "maria",
+    "name": "Maria",
+    "role": null,
+    "psychological": [],
+    "social": [],
+    "motivations": []
+  },
+  {
+    "id": "tom",
+    "name": "Tom",
+    "role": null,
+    "psychological": [],
+    "social": [],
+    "motivations": []
+  },
+  {
+    "id": "li",
+    "name": "Li",
+    "role": null,
+    "psychological": [],
+    "social": [],
+    "motivations": []
+  },
+  {
+    "id": "muhammad",
+    "name": "Muhammad",
+    "role": null,
+    "psychological": [],
+    "social": [],
+    "motivations": []
+  }
+]

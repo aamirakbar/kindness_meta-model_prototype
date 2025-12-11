@@ -1,0 +1,21 @@
+
+# Simplifies running multiple services and common options:
+# - One command (docker compose up) to start the API container.
+# - Keeps volumes, ports, environment variables, and command in one place.
+# (Optional) Define a second service for the simulation if you ever want it in a separate container.
+
+
+services:
+  api:
+    image: kindness-api:dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: kindness-api-dev
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONPATH: /workspace
+    volumes:
+      - .:/workspace
+    command: uvicorn api.api:app --host 0.0.0.0 --port 8000 --reload
