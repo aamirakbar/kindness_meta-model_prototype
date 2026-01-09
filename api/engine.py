@@ -27,8 +27,8 @@ def is_kindness_opportunity(
     for act in motivation_acts:
         if act.increase_other_betterment:
             other_betterment += act.value
-        #if act.decrease_self_betterment:
-            #self_betterment -= act.value
+        if act.decrease_self_betterment:
+            self_betterment -= act.value
 
     return other_betterment > self_betterment
 
@@ -44,8 +44,8 @@ def can_trigger_prompt(
     for act in motivation_acts:
         if act.increase_other_betterment:
             total_motivation += act.value
-        #if act.decrease_self_betterment:
-            #total_motivation += act.value  # subtracting self-betterment increases effective motivation
+        if act.decrease_self_betterment:
+            total_motivation -= act.value 
 
     total_ability = 0.0
     for act in ability_acts:

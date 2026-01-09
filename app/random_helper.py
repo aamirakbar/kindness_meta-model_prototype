@@ -75,10 +75,11 @@ def pick_trust(rand) -> tuple[str, str]:
 
 def compute_motivation_levels(rand, psych: List[dict], social: List[dict]) -> tuple[float, float]:
     """
-    Return (other_betterment, self_betterment) ∈ [-1.0, 1.0], derived from factors:
-      - Positive emotion + high trust + close relatedness → strong betterment
-      - Negative emotion + low trust + stranger → harm-focused
-      - Self-efficacy tilts self-betterment
+    Return (other_betterment, self_betterment) ∈ [-1.0, 1.0], derived from factors.
+
+    This heuristic is tuned to produce a MIX of cases where:
+      - other_betterment > self_betterment
+      - self_betterment > other_betterment
     """
     # Extract useful signals
     emotion = next((f for f in psych if f["kind"] == "Emotion"), None)
@@ -87,47 +88,48 @@ def compute_motivation_levels(rand, psych: List[dict], social: List[dict]) -> tu
     trust   = next((f for f in social if f["kind"] == "Trust"), None)
     need    = next((f for f in social if f["kind"] == "LevelOfNeed"), None)
 
-    # Base scores
-    other = 0.0
-    self_ = 0.0
+    # Base scores: small random offset so we naturally get a mix of cases
+    other = rand.uniform(-0.1, 0.1)
+    self_ = rand.uniform(-0.1, 0.1)
 
-    # Emotion signal
+    # Emotion signal (balanced effect on self and other)
     if emotion:
-        # map level weight
         lvl = {"Low": 0.15, "Medium": 0.35, "High": 0.6}.get(emotion["level"], 0.25)
         if emotion["value"].lower() == "happiness":
-            other += 0.30 * lvl
-            self_ += 0.20 * lvl
+            other += 0.25 * lvl
+            self_ += 0.25 * lvl
         else:  # sadness
             other -= 0.25 * lvl
-            self_ -= 0.15 * lvl
+            self_ -= 0.25 * lvl
 
-    # Trust signal
+    # Trust signal (primarily other-oriented, slightly self-protective)
     if trust:
-        lvl = {"Low": -0.2, "Medium": 0.15, "High": 0.35}.get(trust["level"], 0.0)
-        other += lvl
+        lvl_other = {"Low": -0.15, "Medium": 0.10, "High": 0.25}.get(trust["level"], 0.0)
+        other += lvl_other
+        if trust["level"] == "Low":
+            self_ -= 0.05  # withdrawal when trust is low
 
-    # Relatedness closeness
+    # Relatedness closeness (reduced weight so other isn't almost always higher)
     if related:
         closeness = {
-            "Family": 0.40, "Friend": 0.30, "Neighbour": 0.20,
-            "Colleague": 0.15, "Stranger": -0.20,
+            "Family": 0.25, "Friend": 0.20, "Neighbour": 0.10,
+            "Colleague": 0.05, "Stranger": -0.15,
         }.get(related["value"], 0.0)
-        # intensity as signal strength
         mult = {"Low": 0.5, "Medium": 0.8, "High": 1.0}.get(related["level"], 0.7)
         other += closeness * mult
 
-    # Self-efficacy → self-betterment tilt
+    # Self-efficacy → primarily self-betterment, with a small prosocial spillover
     if seff:
-        lvl = {"Low": -0.15, "Medium": 0.20, "High": 0.40}.get(seff["level"], 0.0)
+        lvl = {"Low": -0.10, "Medium": 0.15, "High": 0.30}.get(seff["level"], 0.0)
         self_ += lvl
+        other += 0.1 * lvl
 
-    # Level of need → altruism tilt (assume high visible need pushes other-betterment)
+    # Level of need → modest altruism tilt
     if need:
-        lvl = {"Low": 0.05, "Medium": 0.15, "High": 0.25}.get(need["level"], 0.0)
+        lvl = {"Low": 0.03, "Medium": 0.10, "High": 0.18}.get(need["level"], 0.0)
         other += lvl
 
-    # Small noise for variety
+    # Additional small noise for variety
     other += rand.uniform(-0.1, 0.1)
     self_ += rand.uniform(-0.1, 0.1)
 

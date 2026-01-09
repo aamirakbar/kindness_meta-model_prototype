@@ -173,24 +173,27 @@ def create_ko(raw: dict):
         if not giver:
             raise HTTPException(status_code=422, detail="Opportunity lacks a Giver")
 
-        # Check kindness opportunity (Algorithm 1)
-        is_ko = is_kindness_opportunity(
-            motivations=giver.motivations,
-            motivation_acts=motivation_acts,
-        )
-        
-        # Base motivation score = other - self (from giver motivations)
+        # Base motivation scores from the Giver (without MotivationActs)
         other = sum(m.level for m in giver.motivations if m.mtype == MotivationType.OTHER_BETTERMENT)
         self_ = sum(m.level for m in giver.motivations if m.mtype == MotivationType.SELF_BETTERMENT)
         base_motivation_score = other - self_
 
+        # MotivationActs are only applied when other-betterment is not already higher
+        effective_motivation_acts: list[MotivationAct] = motivation_acts if other <= self_ else []
+
+        # Check kindness opportunity (Algorithm 1)
+        is_ko = is_kindness_opportunity(
+            motivations=giver.motivations,
+            motivation_acts=effective_motivation_acts,
+        )
+
         # Check prompt readiness (Algorithm 2)
         prompt_ready = can_trigger_prompt(
             base_motivation_score=base_motivation_score,
-            motivation_acts=motivation_acts,
+            motivation_acts=effective_motivation_acts,
             ability_acts=ability_acts,
             action_line=0.2,  # tweakable
-        )        
+        )
         return {
                 "status": "ok",
                 "opportunity_id": ko.id,

@@ -74,8 +74,15 @@ class MotivationAct(SupportingAct):
     frequency: Optional[str] = None
     intensity: str = Field(default="Weak", description="Weak|Strong")
     # engine-facing fields
-    value: float = Field(default=0.0, ge=0.0, le=1.0)  # non-negative (never decrease)
-    increase_other_betterment: bool = Field(default=True)
+    value: float = Field(default=0.0, ge=0.0, le=1.0)  # non-negative (magnitude of effect)
+    increase_other_betterment: bool = Field(
+        default=True,
+        description="If true, this act boosts the giver's other-betterment motivation.",
+    )
+    decrease_self_betterment: bool = Field(
+        default=False,
+        description="If true, this act reduces the giver's self-betterment motivation.",
+    )
 
 
 class AbilityAct(SupportingAct):

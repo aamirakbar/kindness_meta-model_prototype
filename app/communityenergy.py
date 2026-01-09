@@ -149,25 +149,40 @@ class CommunityEnergySimulation:
     # ------------------------------------------------------------------ #
     # Supporting Acts Creations
     # ------------------------------------------------------------------ #
-    def _make_supporting_acts(self) -> list[dict]:
-        # MotivationAct: sometimes increase other-betterment
-        increase = self.rand.random() < 0.5  # 50% chance to boost
-        mot_value = round(self.rand.uniform(0.1, 0.5), 2) if increase else 0.0
-        mot_intensity = "High" if mot_value >= 0.4 else ("Medium" if mot_value >= 0.2 else "Low")
+    def _make_supporting_acts(self, base_other: float, base_self: float) -> list[dict]:
+        """
+        Create supporting acts for a given opportunity.
 
-        mot = {
-            "kind": "MotivationAct",
-            "name": "Highlight benefits of kindness",
-            "type": "personal",
-            "intensity": mot_intensity,
-            "pre":  {"name": "pre",  "value": ""},
-            "post": {"name": "post", "value": ""},
-            "value": mot_value,
-            "increase_other_betterment": increase,
-        }
+        MotivationAct is only included when the Giver's other-betterment is
+        not already higher than self-betterment (i.e., when a motivational
+        boost towards others is actually needed). Ability and Prompt acts
+        are always included.
+        """
+        acts: list[dict] = []
 
-        # AbilityAct: grant ability (positive effect)
-        ability_value = round(self.rand.uniform(0.2, 0.6), 2)
+        # MotivationAct: only when other-betterment is not already higher
+        if base_other <= base_self:
+            mot_value = round(self.rand.uniform(0.05, 0.2), 2)
+            mot_intensity = "High" if mot_value >= 0.4 else ("Medium" if mot_value >= 0.2 else "Low")
+
+            mot = {
+                "kind": "MotivationAct",
+                "name": "Highlight benefits of kindness",
+                "type": "personal",
+                "intensity": mot_intensity,
+                "pre":  {"name": "pre",  "value": ""},
+                "post": {"name": "post", "value": ""},
+                "value": mot_value,
+                "increase_other_betterment": True,
+                "decrease_self_betterment": True,
+            }
+            acts.append(mot)
+
+        # AbilityAct: grant or reduce ability — always included
+        raw_ability_value = round(self.rand.uniform(0.2, 0.6), 2)
+        is_positive = self.rand.random() < 0.7  # e.g. 70% positive, 30% negative
+        ability_effect = "positive" if is_positive else "negative"
+        ability_value = raw_ability_value
         ability = {
             "kind": "AbilityAct",
             "name": "Provide energy sharing facility",
@@ -175,12 +190,12 @@ class CommunityEnergySimulation:
             "effort_target": "EffortToShareSurplus",
             "pre":  {"name": "pre",  "value": ""},
             "post": {"name": "post", "value": ""},
-            "effect": "positive",
+            "effect": ability_effect,
             "value": ability_value
-
         }
+        acts.append(ability)
 
-        # PromptAct: last in sequence
+        # PromptAct: last in sequence — always included
         prompt = {
             "kind": "PromptAct",
             "name": "Send dashboard notification",
@@ -189,8 +204,9 @@ class CommunityEnergySimulation:
             "pre":  {"name": "pre",  "value": ""},
             "post": {"name": "post", "value": ""},
         }
+        acts.append(prompt)
 
-        return [mot, ability, prompt]  # PromptAct last
+        return acts  # PromptAct last
 
     # ------------------------------------------------------------------ #
     # Opportunity creation
@@ -216,21 +232,27 @@ class CommunityEnergySimulation:
         # Build per-actor overrides
         overrides = {
             giver_id: build_overrides_for_actor(
-                                self.rand,
-                                role="Giver",
-                                target_id=receiver_id,
-                                inject_social_signals={"Relatedness": relatedness, "Trust": trust_signal},
-                            ),
+                self.rand,
+                role="Giver",
+                target_id=receiver_id,
+                inject_social_signals={"Relatedness": relatedness, "Trust": trust_signal},
+            ),
             receiver_id: build_overrides_for_actor(
-                                self.rand,
-                                role="Receiver",
-                                target_id=None,
-                                inject_social_signals={"Relatedness": relatedness, "Trust": trust_signal},
-                            ),
+                self.rand,
+                role="Receiver",
+                target_id=None,
+                inject_social_signals={"Relatedness": relatedness, "Trust": trust_signal},
+            ),
         }
 
-        # Generate Supporting Acts
-        supporting_acts = self._make_supporting_acts()
+        # Derive the Giver's base motivation scores from overrides
+        giver_bundle = overrides.get(giver_id, {})
+        giver_mots = giver_bundle.get("motivations", [])
+        base_other = sum(m.get("level", 0.0) for m in giver_mots if m.get("mtype") == "Other_Betterment")
+        base_self = sum(m.get("level", 0.0) for m in giver_mots if m.get("mtype") == "Self_Betterment")
+
+        # Generate Supporting Acts, conditioned on base motivations
+        supporting_acts = self._make_supporting_acts(base_other=base_other, base_self=base_self)
         
         payload = {
             "id": ko_id,
@@ -275,9 +297,10 @@ class CommunityEnergySimulation:
                 )
         return render_event_summary(
                 event=event_view,
-                ko_payload=payload,    # the dict you posted
+                ko_payload=payload,    # the dict posted
                 ko_response=resp,      # flags from API
             )
+        
 
 
     
