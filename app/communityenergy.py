@@ -4,6 +4,7 @@ import argparse
 import json
 import random
 import http.client
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -66,6 +67,7 @@ class CommunityEnergySimulation:
         self.actors_path = actors_path
         self.links_path = links_path
         self.actor_ids: List[str] = []
+        self.actor_base_motivations: Dict[str, Tuple[float, float]] = {}
         self.tie_strength: Dict[Tuple[str, str], float] = {}
         self.time_step = 0
         self.history: List[str] = []
@@ -80,6 +82,11 @@ class CommunityEnergySimulation:
     def _seed_actors(self) -> None:
         payload = json.loads(self.actors_path.read_text(encoding="utf-8"))
         for a in payload:
+            # Assign baseline motivations if not present, default to 0.0
+            base_other = a.setdefault("base_other_betterment", 0.0)
+            base_self = a.setdefault("base_self_betterment", 0.0)
+            self.actor_base_motivations[a["id"]] = (base_other, base_self)
+
             a.setdefault("role", None)
             a.setdefault("psychological", [])
             a.setdefault("social", [])
@@ -178,40 +185,43 @@ class CommunityEnergySimulation:
             }
             acts.append(mot)
 
-        # AbilityAct: grant or reduce ability — always included
-        raw_ability_value = round(self.rand.uniform(0.2, 0.6), 2)
-        is_positive = self.rand.random() < 0.7  # e.g. 70% positive, 30% negative
-        ability_effect = "positive" if is_positive else "negative"
-        ability_value = raw_ability_value
-        ability = {
-            "kind": "AbilityAct",
-            "name": "Provide energy sharing facility",
-            "domain": "digital",
-            "effort_target": "EffortToShareSurplus",
-            "pre":  {"name": "pre",  "value": ""},
-            "post": {"name": "post", "value": ""},
-            "effect": ability_effect,
-            "value": ability_value
-        }
-        acts.append(ability)
+        # AbilityAct and PromptAct: either both included or both omitted (random)
+        include_ability_and_prompt = self.rand.random() < 0.5  # 50% chance to include
+        if include_ability_and_prompt:
+            # AbilityAct
+            raw_ability_value = round(self.rand.uniform(0.2, 0.6), 2)
+            is_positive = self.rand.random() < 0.7  # e.g. 70% positive effect, 30% negative effect
+            ability_effect = "positive" if is_positive else "negative"
+            ability_value = raw_ability_value
+            ability = {
+                "kind": "AbilityAct",
+                "name": "Provide energy sharing facility",
+                "domain": "digital",
+                "effort_target": "EffortToShareSurplus",
+                "pre":  {"name": "pre",  "value": ""},
+                "post": {"name": "post", "value": ""},
+                "effect": ability_effect,
+                "value": ability_value
+            }
+            acts.append(ability)
 
-        # PromptAct: last in sequence — always included
-        prompt = {
-            "kind": "PromptAct",
-            "name": "Send dashboard notification",
-            "channel": "dashboard_notification",
-            "message": "Share energy with your neighbour.",
-            "pre":  {"name": "pre",  "value": ""},
-            "post": {"name": "post", "value": ""},
-        }
-        acts.append(prompt)
+            # PromptAct: last in sequence
+            prompt = {
+                "kind": "PromptAct",
+                "name": "Send dashboard notification",
+                "channel": "dashboard_notification",
+                "message": "Share energy with your neighbour.",
+                "pre":  {"name": "pre",  "value": ""},
+                "post": {"name": "post", "value": ""},
+            }
+            acts.append(prompt)
 
         return acts  # PromptAct last
 
     # ------------------------------------------------------------------ #
     # Opportunity creation
     # ------------------------------------------------------------------ #
-    def _post_random_opportunity(self) -> Optional[str]:
+    def _post_random_opportunity(self, detailed_summary: bool = False) -> Optional[str]:
         if len(self.actor_ids) < 2:
             return None
 
@@ -229,18 +239,24 @@ class CommunityEnergySimulation:
         relatedness = self._strength_to_relatedness(strength)
         trust_signal = "Familiarity"  # meta-model's trust value
         
+        # Get base motivations
+        giver_base_motivations = self.actor_base_motivations.get(giver_id, (0.0, 0.0))
+        receiver_base_motivations = self.actor_base_motivations.get(receiver_id, (0.0, 0.0))
+
         # Build per-actor overrides
         overrides = {
             giver_id: build_overrides_for_actor(
                 self.rand,
                 role="Giver",
                 target_id=receiver_id,
+                base_motivations=giver_base_motivations,
                 inject_social_signals={"Relatedness": relatedness, "Trust": trust_signal},
             ),
             receiver_id: build_overrides_for_actor(
                 self.rand,
                 role="Receiver",
                 target_id=None,
+                base_motivations=receiver_base_motivations,
                 inject_social_signals={"Relatedness": relatedness, "Trust": trust_signal},
             ),
         }
@@ -295,24 +311,33 @@ class CommunityEnergySimulation:
                     is_ko=bool(resp.get("is_kindness_opportunity", False)),
                     prompt_ready=bool(resp.get("prompt_ready", False))
                 )
-        return render_event_summary(
+        
+        if detailed_summary:
+            return render_event_summary(
                 event=event_view,
                 ko_payload=payload,    # the dict posted
                 ko_response=resp,      # flags from API
             )
-        
+        else:
+            return str(bool(resp.get("is_kindness_opportunity", False))) + " " +  str(bool(resp.get("prompt_ready", False)))
+
 
 
     
     # ------------------------------------------------------------------ #
     # Simulation lifecycle
     # ------------------------------------------------------------------ #    
-    def run(self, steps: int = 10, verbose: bool = True) -> List[str]:
+    def run(self, steps: int = 10, verbose: bool = False, detailed_summary: bool = False) -> List[str]:
             for _ in range(steps):
                 self.time_step += 1
                 self._update_relationships()
-                event = self._post_random_opportunity()
-                if verbose:
+                event = self._post_random_opportunity(detailed_summary=detailed_summary)
+                if detailed_summary: # If detailed_summary is true, print the event immediately
+                    if event:
+                        print(event)
+                    else:
+                        print(f"[t={self.time_step:03d}] No eligible opportunity.")
+                elif verbose: # If not detailed_summary but verbose is true, print the basic event
                     if event:
                         print(event)
                     else:
@@ -334,6 +359,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=10, help="Number of simulation steps to run")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
     parser.add_argument("--quiet", action="store_true", help="Suppress console output")
+    parser.add_argument("--summary", action="store_true", help="Print detailed summary for each step instead of the final count table")
     return parser.parse_args()
 
 
@@ -345,7 +371,35 @@ def main() -> None:
         links_path=args.links_path,
         seed=args.seed,
     )
-    sim.run(steps=args.steps, verbose=not args.quiet)
+    history = sim.run(
+        steps=args.steps,
+        verbose=not args.quiet,
+        detailed_summary=args.summary
+    )
+
+    # Only print the count table if we are not in detailed summary mode
+    if not args.summary:
+        # Count occurrences of each combination
+        counts = Counter(history)
+        
+        # Define the combinations in order
+        combinations = ['True True', 'True False', 'False True', 'False False']
+        
+        # Print table header
+        print("\n" + "=" * 40)
+        print("Combination Count Table")
+        print("=" * 40)
+        print(f"{'is_KO | AS >= AL':<20} {'Count':<10}")
+        print("-" * 40)
+        
+        # Print each combination with its count
+        for combo in combinations:
+            count = counts.get(combo, 0)
+            print(f"{combo:<20} {count:<10}")
+        
+        print("=" * 40)
+        print(f"Total: {len(history)}")
+        print("=" * 40 + "\n")
 
 
 if __name__ == "__main__":

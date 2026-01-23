@@ -1,0 +1,98 @@
+/*Each top-level key (emotion, trust, relatedness, etc.) corresponds to a factor 
+  that can influence an actor's other_betterment and self_betterment scores.
+
+  Example with "Emotion":
+    If an actor feels "High" Happiness:
+    - The base other_betterment_factor is 0.25.
+    - The level_multipliers for "High" is 0.6.
+    - The final tilt to other_betterment is 0.25 * 0.6 = 0.15
+
+    If an actor feels "Low" Happiness:
+    - The base other_betterment_factor is still 0.25.
+    - The level_multipliers for "Low" is 0.15.
+    - The final tilt is only 0.25 * 0.15 = 0.0375.
+
+  trust:
+    * `level_effects`: This section models a direct "tilt" to motivation. 
+    Unlike emotion, it's not a multiplier but a direct value to add or subtract.
+
+  relatedness
+    * `closeness`: This defines the base effect of the relationship type. 
+    "Family" has a much stronger positive effect than "Stranger."
+    * `level_multipliers`: This models the intensity of the relationship signal.
+
+  self_efficacy
+    * `level_effects`: A direct tilt based on how capable an actor feels. 
+    Feeling more capable ("High") increases self_betterment.
+    * `prosocial_spillover`: It models the idea that when you feel capable and good 
+    about yourself, you're slightly more likely to help others.
+
+  level_of_need
+    * `level_effects`: A direct altruistic tilt. The higher the perceived need of the other person, 
+    the bigger the boost to the actor's other_betterment score.
+
+  noise
+   * This adds a small amount of randomness back into the final calculation to prevents the 
+    simulation from being completely deterministic.
+*/
+
+
+{
+  "emotion": {
+    "happiness": {
+      "other_betterment_factor": 0.25,
+      "self_betterment_factor": 0.25
+    },
+    "sadness": {
+      "other_betterment_factor": -0.25,
+      "self_betterment_factor": -0.25
+    },
+    "level_multipliers": {
+      "Low": 0.15,
+      "Medium": 0.35,
+      "High": 0.6,
+      "default": 0.25
+    }
+  },
+  "trust": {
+    "level_effects": {
+      "Low": { "other_betterment_tilt": -0.15, "self_betterment_tilt": -0.05 },
+      "Medium": { "other_betterment_tilt": 0.10 },
+      "High": { "other_betterment_tilt": 0.25 }
+    }
+  },
+  "relatedness": {
+    "closeness": {
+      "Family": 0.25,
+      "Friend": 0.20,
+      "Neighbour": 0.10,
+      "Colleague": 0.05,
+      "Stranger": -0.15
+    },
+    "level_multipliers": {
+      "Low": 0.5,
+      "Medium": 0.8,
+      "High": 1.0,
+      "default": 0.7
+    }
+  },
+  "self_efficacy": {
+    "level_effects": {
+      "Low": -0.10,
+      "Medium": 0.15,
+      "High": 0.30
+    },
+    "prosocial_spillover": 0.1
+  },
+  "level_of_need": {
+    "level_effects": {
+      "Low": 0.03,
+      "Medium": 0.10,
+      "High": 0.18
+    }
+  },
+  "noise": {
+      "other_betterment": 0.1,
+      "self_betterment": 0.1
+  }
+}

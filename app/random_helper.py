@@ -1,5 +1,7 @@
 # random_helper.py
 from __future__ import annotations
+import json
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 #--------------------------- Random helpers ------------------------- #
@@ -73,65 +75,72 @@ def pick_trust(rand) -> tuple[str, str]:
 
 # --------------------------- Motivation heuristic ------------------- #
 
-def compute_motivation_levels(rand, psych: List[dict], social: List[dict]) -> tuple[float, float]:
+def compute_motivation_levels(
+    rand,
+    psych: List[dict],
+    social: List[dict],
+    weights: dict,
+    base_motivations: Optional[Tuple[float, float]] = None
+) -> tuple[float, float]:
     """
     Return (other_betterment, self_betterment) ∈ [-1.0, 1.0], derived from factors.
-
-    This heuristic is tuned to produce a MIX of cases where:
-      - other_betterment > self_betterment
-      - self_betterment > other_betterment
+    The heuristic is now driven by a weights configuration dictionary.
     """
     # Extract useful signals
     emotion = next((f for f in psych if f["kind"] == "Emotion"), None)
-    seff   = next((f for f in psych if f["kind"] == "SelfEfficacy"), None)
+    seff = next((f for f in psych if f["kind"] == "SelfEfficacy"), None)
     related = next((f for f in social if f["kind"] == "Relatedness"), None)
-    trust   = next((f for f in social if f["kind"] == "Trust"), None)
-    need    = next((f for f in social if f["kind"] == "LevelOfNeed"), None)
+    trust = next((f for f in social if f["kind"] == "Trust"), None)
+    need = next((f for f in social if f["kind"] == "LevelOfNeed"), None)
 
-    # Base scores: small random offset so we naturally get a mix of cases
-    other = rand.uniform(-0.1, 0.1)
-    self_ = rand.uniform(-0.1, 0.1)
+    # Base scores: start with the actor's disposition, or a random offset
+    if base_motivations:
+        other, self_ = base_motivations
+    else:
+        other = rand.uniform(-0.1, 0.1)
+        self_ = rand.uniform(-0.1, 0.1)
 
-    # Emotion signal (balanced effect on self and other)
+    # Emotion signal
     if emotion:
-        lvl = {"Low": 0.15, "Medium": 0.35, "High": 0.6}.get(emotion["level"], 0.25)
-        if emotion["value"].lower() == "happiness":
-            other += 0.25 * lvl
-            self_ += 0.25 * lvl
-        else:  # sadness
-            other -= 0.25 * lvl
-            self_ -= 0.25 * lvl
+        emo_weights = weights.get("emotion", {})
+        multipliers = emo_weights.get("level_multipliers", {})
+        lvl = multipliers.get(emotion["level"], multipliers.get("default", 0.0))
+        
+        effect = emo_weights.get(emotion["value"].lower(), {})
+        other += effect.get("other_betterment_factor", 0.0) * lvl
+        self_ += effect.get("self_betterment_factor", 0.0) * lvl
 
-    # Trust signal (primarily other-oriented, slightly self-protective)
+    # Trust signal
     if trust:
-        lvl_other = {"Low": -0.15, "Medium": 0.10, "High": 0.25}.get(trust["level"], 0.0)
-        other += lvl_other
-        if trust["level"] == "Low":
-            self_ -= 0.05  # withdrawal when trust is low
+        trust_weights = weights.get("trust", {}).get("level_effects", {})
+        effect = trust_weights.get(trust["level"], {})
+        other += effect.get("other_betterment_tilt", 0.0)
+        self_ += effect.get("self_betterment_tilt", 0.0)
 
-    # Relatedness closeness (reduced weight so other isn't almost always higher)
+    # Relatedness closeness
     if related:
-        closeness = {
-            "Family": 0.25, "Friend": 0.20, "Neighbour": 0.10,
-            "Colleague": 0.05, "Stranger": -0.15,
-        }.get(related["value"], 0.0)
-        mult = {"Low": 0.5, "Medium": 0.8, "High": 1.0}.get(related["level"], 0.7)
+        rel_weights = weights.get("relatedness", {})
+        closeness = rel_weights.get("closeness", {}).get(related["value"], 0.0)
+        multipliers = rel_weights.get("level_multipliers", {})
+        mult = multipliers.get(related["level"], multipliers.get("default", 0.0))
         other += closeness * mult
 
-    # Self-efficacy → primarily self-betterment, with a small prosocial spillover
+    # Self-efficacy
     if seff:
-        lvl = {"Low": -0.10, "Medium": 0.15, "High": 0.30}.get(seff["level"], 0.0)
-        self_ += lvl
-        other += 0.1 * lvl
+        seff_weights = weights.get("self_efficacy", {})
+        lvl_effect = seff_weights.get("level_effects", {}).get(seff["level"], 0.0)
+        self_ += lvl_effect
+        other += seff_weights.get("prosocial_spillover", 0.0) * lvl_effect
 
-    # Level of need → modest altruism tilt
+    # Level of need
     if need:
-        lvl = {"Low": 0.03, "Medium": 0.10, "High": 0.18}.get(need["level"], 0.0)
-        other += lvl
+        need_weights = weights.get("level_of_need", {}).get("level_effects", {})
+        other += need_weights.get(need["level"], 0.0)
 
     # Additional small noise for variety
-    other += rand.uniform(-0.1, 0.1)
-    self_ += rand.uniform(-0.1, 0.1)
+    noise = weights.get("noise", {})
+    other += rand.uniform(-noise.get("other_betterment", 0.0), noise.get("other_betterment", 0.0))
+    self_ += rand.uniform(-noise.get("self_betterment", 0.0), noise.get("self_betterment", 0.0))
 
     # Clamp to [-1, 1]
     other = max(-1.0, min(1.0, other))
@@ -139,10 +148,13 @@ def compute_motivation_levels(rand, psych: List[dict], social: List[dict]) -> tu
     return other, self_
 
 
+
+
 def build_overrides_for_actor(
         rand, 
         role: str, 
         target_id: str | None = None,
+        base_motivations: Optional[Tuple[float, float]] = None,
         inject_social_signals: Dict[str, str] | None = None,
     ) -> dict:
     """
@@ -152,6 +164,15 @@ def build_overrides_for_actor(
     Create psychological + social factors, and motivation levels derived from them.
     Output shape matches the API's expected 'actor_overrides' bundle.
     """    
+    # Load the motivation weights configuration
+    base_dir = Path(__file__).resolve().parent
+    weights_path = base_dir / "data" / "scenarios" / "motivation_weights.json"
+    try:
+        with open(weights_path, "r") as f:
+            weights = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        weights = {} # Fallback to empty dict if file is missing or invalid
+
     # Observer: no overrides
     if role == "Observer":
         return {}
@@ -198,7 +219,7 @@ def build_overrides_for_actor(
     # Motivations derived from factors    
     motivations: List[dict] = []
     if role == "Giver":
-        other, self_ = compute_motivation_levels(rand, psych, social)
+        other, self_ = compute_motivation_levels(rand, psych, social, weights, base_motivations)
         motivations = [
             {"mtype": "Other_Betterment", "level": round(other, 2),  "towards_actor_id": target_id},
             {"mtype": "Self_Betterment",  "level": round(self_, 2), "towards_actor_id": target_id},

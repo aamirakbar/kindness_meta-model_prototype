@@ -6,12 +6,12 @@
 
 #Classify kindness opportunity (Algorithm 1)
 
-from typing import List
+from typing import List, Optional
 from .models import Motivation, MotivationAct, MotivationType, AbilityAct
 
 def is_kindness_opportunity(
     motivations: List[Motivation],
-    motivation_acts: List[MotivationAct],
+    motivation_acts: Optional[List[MotivationAct]] = None,
 ) -> bool:
     other_betterment = 0.0
     self_betterment  = 0.0
@@ -24,7 +24,7 @@ def is_kindness_opportunity(
             self_betterment += m.level
 
     # Effects of MotivationActs
-    for act in motivation_acts:
+    for act in motivation_acts or []:
         if act.increase_other_betterment:
             other_betterment += act.value
         if act.decrease_self_betterment:
@@ -36,21 +36,21 @@ def is_kindness_opportunity(
 
 def can_trigger_prompt(
     base_motivation_score: float,
-    motivation_acts: List[MotivationAct],
-    ability_acts: List[AbilityAct],
+    motivation_acts: Optional[List[MotivationAct]] = None,
+    ability_acts: Optional[List[AbilityAct]] = None,
     action_line: float = 0.5,
 ) -> bool:
     total_motivation = base_motivation_score
-    for act in motivation_acts:
+    for act in motivation_acts or []:
         if act.increase_other_betterment:
             total_motivation += act.value
         if act.decrease_self_betterment:
             total_motivation -= act.value 
 
     total_ability = 0.0
-    for act in ability_acts:
+    for act in ability_acts or []:
         total_ability += act.value if act.effect == "positive" else -act.value
 
-    # Choose a simple, monotone action score; can be swapped later:
+    # A simple action score; can be swapped later:
     action_score = 0.6 * total_motivation + 0.4 * total_ability
     return action_score >= action_line

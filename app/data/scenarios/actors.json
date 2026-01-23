@@ -3,6 +3,8 @@
     "id": "alice",
     "name": "Alice",
     "role": null,
+    "base_other_betterment": 0.4,
+    "base_self_betterment": -0.1,
     "psychological": [],
     "social": [],
     "motivations": []
@@ -11,6 +13,8 @@
     "id": "maria",
     "name": "Maria",
     "role": null,
+    "base_other_betterment": 0.2,
+    "base_self_betterment": 0.0,
     "psychological": [],
     "social": [],
     "motivations": []
@@ -19,6 +23,8 @@
     "id": "tom",
     "name": "Tom",
     "role": null,
+    "base_other_betterment": 0.1,
+    "base_self_betterment": 0.3,
     "psychological": [],
     "social": [],
     "motivations": []
@@ -27,6 +33,8 @@
     "id": "li",
     "name": "Li",
     "role": null,
+    "base_other_betterment": 0.0,
+    "base_self_betterment": 0.2,
     "psychological": [],
     "social": [],
     "motivations": []
@@ -35,6 +43,8 @@
     "id": "muhammad",
     "name": "Muhammad",
     "role": null,
+    "base_other_betterment": 0.3,
+    "base_self_betterment": -0.2,
     "psychological": [],
     "social": [],
     "motivations": []

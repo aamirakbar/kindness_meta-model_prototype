@@ -44,7 +44,9 @@ class Actor(BaseModel):
     id: str
     name: str
     type: str = "Human"  # or "Software"
-    role: Role | None = Field(default=None)    
+    role: Role | None = Field(default=None)
+    base_other_betterment: float = Field(default=0.0, ge=-1.0, le=1.0)
+    base_self_betterment: float = Field(default=0.0, ge=-1.0, le=1.0)
     motivations: List[Motivation] = Field(default_factory=list)
     psychological: List[PsychologicalFactor] = Field(default_factory=list)
     social: List[SocialFactor] = Field(default_factory=list)
