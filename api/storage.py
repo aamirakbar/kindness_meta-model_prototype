@@ -22,3 +22,9 @@ class MemoryStore:
 
     def list_opportunities(self):
         return list(self.opportunities.values())
+
+    def delete_opportunity(self, ko_id: str) -> bool:
+        if ko_id in self.opportunities:
+            del self.opportunities[ko_id]
+            return True
+        return False

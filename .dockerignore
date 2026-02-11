@@ -1,4 +1,24 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+
+# Environment
 .env
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+
+# Tests (if any)
+tests/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
